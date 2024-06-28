@@ -128,7 +128,7 @@ class WeaselTSF : public ITfTextInputProcessorEx,
   void _HandleLangBarMenuSelect(UINT wID);
 
   /* IPC */
-  void _EnsureServerConnected();
+  bool _EnsureServerConnected();
 
   /* UI */
   void _UpdateUI(const weasel::Context& ctx, const weasel::Status& status);
@@ -187,6 +187,9 @@ class WeaselTSF : public ITfTextInputProcessorEx,
   BOOL _InitCompartment();
   void _UninitCompartment();
   HRESULT _HandleCompartment(REFGUID guidCompartment);
+
+  void _Reconnect();
+  std::wstring _GetRootDir();
 
   bool isImmersive() const {
     return (_activateFlags & TF_TMF_IMMERSIVEMODE) != 0;

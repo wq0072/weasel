@@ -16,16 +16,9 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
                        int nCmdShow) {
   UNREFERENCED_PARAMETER(hPrevInstance);
 
-  LCID lcid = GetUserDefaultLCID();
-  if (lcid == 2052 || lcid == 3072 || lcid == 4100) {
-    LANGID langId = SetThreadUILanguage(
-        MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED));
-    SetThreadLocale(langId);
-  } else {
-    LANGID langId = SetThreadUILanguage(
-        MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL));
-    SetThreadLocale(langId);
-  }
+  LANGID langId = get_language_id();
+  SetThreadUILanguage(langId);
+  SetThreadLocale(langId);
 
   HRESULT hRes = ::CoInitialize(NULL);
   // If you are running on NT 4.0 or higher you can use the following call

@@ -41,15 +41,19 @@ void Configurator::Initialize() {
   weasel_traits.shared_data_dir = shared_dir.c_str();
   weasel_traits.user_data_dir = user_dir.c_str();
   weasel_traits.prebuilt_data_dir = weasel_traits.shared_data_dir;
-  std::string distribution_name = wstring_to_string(WEASEL_IME_NAME, CP_UTF8);
+  std::string distribution_name =
+      wstring_to_string(get_weasel_ime_name(), CP_UTF8);
   weasel_traits.distribution_name = distribution_name.c_str();
   weasel_traits.distribution_code_name = WEASEL_CODE_NAME;
   weasel_traits.distribution_version = WEASEL_VERSION;
   weasel_traits.app_name = "rime.weasel";
-  RimeSetup(&weasel_traits);
-
+  std::string log_dir = WeaselLogPath().u8string();
+  weasel_traits.log_dir = log_dir.c_str();
+  RimeApi* rime_api = rime_get_api();
+  assert(rime_api);
+  rime_api->setup(&weasel_traits);
   LOG(INFO) << "WeaselDeployer reporting.";
-  RimeDeployerInitialize(NULL);
+  rime_api->deployer_initialize(NULL);
 }
 
 static bool configure_switcher(RimeLeversApi* api,
