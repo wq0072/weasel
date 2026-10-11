@@ -1,5 +1,305 @@
+<a name="0.17.4"></a>
+## [0.17.4](https://github.com/rime/weasel/compare/0.17.3...0.17.4)(2025-06-04)
+
+### 主要更新
+* 修复#1585 未处理完整的用户目录路径打开处理问题
+
+#### Code Refactor
+refactor(WeaselTSF): add error handling when try open RimeUserDir ([fxliang](https://github.com/rime/weasel/commit/7a52fce2e6f5a991c58f2a19c93e82d3cfa191d3))
+
+#### Bug Fixes
+fix(WeaselSetup): RimeUserDir in registry is empty when default location ([fxliang](https://github.com/rime/weasel/commit/1ffd4412005962e0f9dd88558f23ec37e982ce59))
+
+<a name="0.17.3"></a>
+## [0.17.3](https://github.com/rime/weasel/compare/0.17.0...0.17.3)(2025-05-24)
+
+### 主要更新
+* 修复未自定义设定用户目录潜在可能无法在右键菜单打开用户目录的问题
+* 修复配色方案中未定义色回退错误问题
+* 回退#1499，修复由之产生的inline_preedit失效问题
+
+#### Bug Fixes
+fix(WeaselTSF): explore user dir failed if it's not customized ([fxliang](https://github.com/rime/weasel/commit/facecbf2d29cb45ee695e5a27e68f76dd796264a))
+fix(RimeWithWeasel): color parsing for decimal number fix(RimeWithWeasel): highlight label color and highlight comment color not correct when it's not defined ([fxliang](https://github.com/rime/weasel/commit/c52f260c603aa5b19b084317c22c978e61cbbaab))
+
+#### Commits
+Revert "fix(tsf): ime status (#1499)" ([居戎氏](https://github.com/rime/weasel/commit/c72cbc8e002f88c2b24b6866e28260897e49d1fe))
+
+<a name="0.17.0"></a>
+## [0.17.0](https://github.com/rime/weasel/compare/0.16.3...0.17.0)(2025-05-17)
+
+### 主要更新
+* 更新 librime 至 1.13.1 版本
+* 修復托盤圖標卡死問題
+* 修復當熱鍵設置為空時 WeaselDeployer 崩潰的問題
+* 修復更新安裝後可能導致重啟後程式檔案被刪除的問題
+* 修復多線程導致的服務崩潰問題
+* 修復部分應用程式中的異常崩潰問題
+* 修復部分應用中無法顯示輸入法的問題
+* 修復因顯示卡重置導致的文字繪製失敗問題
+* 修復「天圓地方」狀態下編碼高亮未正確繪製的問題
+* 修復 vim-mode 下按鍵響應異常問題
+* 修復輸入法顯示狀態異常問題
+* 修復全螢幕模式下高亮背景繪製錯誤問題
+* 修正混色算法，解決部分情況下的混色異常問題
+* `WeaselDeployer.exe` 和 `WeaselSetup.exe` 新增 `/h` 及 `/help` 參數，顯示使用說明
+* `WeaselSetup.exe` 新增參數支援設定用戶資料目錄，例如：`WeaselSetup.exe /userdir:D:\rime_data_dir`
+
+#### Code Refactor
+refactor(WeaselUI): DirectWriteResources ([fxliang](https://github.com/rime/weasel/commit/16672f47cfcb75426459afa8d4ba3c7069eeb2d8))
+refactor(WeaselTSF): simplify codes of RegisterCategories and UnregisterCategories ([fxliang](https://github.com/rime/weasel/commit/4b47310e95c76cfffb0c0828be9563dbb4125aeb))
+refactor(WeaselTSF): simplify codes of RegisterProfiles and UnregisterProfiles ([fxliang](https://github.com/rime/weasel/commit/83881f07227ffec2f202847a6d2cbb28991f7fcc))
+refactor(RimeWithWeasel): simplify configuration parsing ([fxliang](https://github.com/rime/weasel/commit/8125608f3f24ec16c1e2b78ee8ff8b0a2f5d1dbc))
+refactor(WeaselDeployer): string convertions with macro ([fxliang](https://github.com/rime/weasel/commit/30e5adf80e2171fee40cebad71281c8551210e55))
+refactor(RimeWithWeasel): simplify _LoadSchemaSpecificSettings ([fxliang](https://github.com/rime/weasel/commit/aba0609f64e5122748db80150de9644ffec0699f))
+refactor(RimeWithWeasel): string convertions with macro ([fxliang](https://github.com/rime/weasel/commit/597993e8992e5081c9c0786c9b491c93fc3bbd71))
+
+#### Features
+feat: WeaselSetup.exe with new param /? or /help to show help info ([fxliang](https://github.com/rime/weasel/commit/63f27915f3dd03da2bc2b9d4ae1209f1b5e56e0b))
+feat: WeaselDeployer.exe with new param /? or /help to show help info ([fxliang](https://github.com/rime/weasel/commit/1004f399d4b5c90652ae63f33f40247adc56e91b))
+feat: WeaselSetup.exe parameter /userdir:<user_data_dir_full_path> to set user data directory in command line ([fxliang](https://github.com/rime/weasel/commit/0ef3154e489eed1176e9ca3a2e5f244fc0c1cf0f))
+feat: WeaselSetup 默认启动不请求管理员权限，必要时使用管理员权限重启 (#1390) ([Wendy](https://github.com/rime/weasel/commit/ba768a6d65895837b052a1d366ffb872df5f0091))
+
+#### Chores
+chore: update bump version scripts ([fxliang](https://github.com/rime/weasel/commit/967674ff5295c4a389b35e9f8070b9fe43d0dcb1))
+chore: update update/bump-version.ps1 [skip ci] ([fxliang](https://github.com/rime/weasel/commit/d13fd1250545d05df6573be7c0dee2529a4dc3fc))
+chore: update update/bump_version.sh [skip ci] ([fxliang](https://github.com/rime/weasel/commit/8d12cafec0a84498c3f32d6821b7ccbd85fe1f21))
+chore: follow #1379, update `update/bump-version.sh` to work without clog[skip ci] ([fxliang](https://github.com/rime/weasel/commit/d75b34bce20026f54ebbae73b6c591b3db473d11))
+chore: make clang-format.ps1 worked in linux/Mac OS[skip ci] ([fxliang](https://github.com/rime/weasel/commit/d3e872c6671aaab5bfc0a6caa8227b416a5c5601))
+chore: update update/bump_version.ps1 ([fxliang](https://github.com/rime/weasel/commit/18cb65206c494e5b3bc21380dc938d5553a7e83a))
+chore: add powershell script for linting ([fxliang](https://github.com/rime/weasel/commit/a6d15cea4ad14c921bbde4c6b9c99a8a15c4dcde))
+chore: update .gitignore ([fxliang](https://github.com/rime/weasel/commit/094e99de9e47b0aa9469b3d94a03e78501d8b1bb))
+chore(install_boost): update boost download url ([居戎氏](https://github.com/rime/weasel/commit/235308dc7425529b49ffe3a5eb29947a4657f8cd))
+
+#### Builds
+build: bump librime to 1.13.0 ([fxliang](https://github.com/rime/weasel/commit/9a5244b1fae8de8f52c2f774eddc2986d869e98a))
+build: set /utf-8 for source compilation ([fxliang](https://github.com/rime/weasel/commit/acbb0c393c65ebfea2ac176723f08e5b121442aa))
+build: IntDir and OutDir set for msbuild solution, intermediary files will be always in `$(SolutionDir)\msbuild`. ([fxliang](https://github.com/rime/weasel/commit/5d5d5b0338a5eead4d898a2589f280015acdae85))
+
+#### Continuous Integration
+ci: run update rime/home appcast on published or prereleased ([fxliang](https://github.com/rime/weasel/commit/41dc044d7c34d30a574a72095361abf345c133f5))
+ci: bump librime 1.13.1 ([fxliang](https://github.com/rime/weasel/commit/d279d9d78cce33a4e3f36e29c0a1ef6bef423121))
+ci: draft before release ([fxliang](https://github.com/rime/weasel/commit/57b4cc44b46a1e9050b154178885cfccd1e9fdbe))
+
+#### Bug Fixes
+fix(trayicon): explorer.exe hangs ([fxliang](https://github.com/rime/weasel/commit/f11831fb16446ab98c1a2fee9ec6245a0d24144b))
+fix(WeaselUI): hemispherical of hilite text preedit not correct ([fxliang](https://github.com/rime/weasel/commit/6e884c299b28c4a8e2d5ed2dc1845e702da35868))
+fix(WeaselDeployer): WeaselDeployer will dump if hotkeys is set empty #1549 ([fxliang](https://github.com/rime/weasel/commit/bf4853dde1a4476489c4d7e85ab9407e5fc7c5f7))
+fix(RimeWithWeasel): avoid vim_mode misoperations (#1543) ([fxliang](https://github.com/rime/weasel/commit/c2beb41a63567de7b9399ede13db65f0d3254221))
+fix(installer): avoid files are deleted on system reboot after reinstallation (#1520) ([fxliang](https://github.com/rime/weasel/commit/2f92c6c5b885caf633f61d47e21ae61a93658246))
+fix(tsf): ime status (#1499) ([wzv5](https://github.com/rime/weasel/commit/ea49aa13e936cf2309854ee353f18c2442153643))
+fix(CandidateList): not displaying in some applications (#1494) ([wzv5](https://github.com/rime/weasel/commit/35afa144056e26e26f1c5eb092fd77942174cb35))
+fix(ipcserver): concurrent access to rime api ([居戎氏](https://github.com/rime/weasel/commit/2dc4e1923a95d8ad4c1eff19399614253507c0fe))
+fix(RimeWithWeasel): blend_colors algorithm, fix issue like #1405 ([fxliang](https://github.com/rime/weasel/commit/5dbafbb893cd79c876dab8600833266ce12ecdbd))
+fix(WeaselUI): highlight back is not drawn correctly when fullscreen layout set ([fxliang](https://github.com/rime/weasel/commit/8b95887f4e2375659ed228e921f481a462b97376))
+fix(CandidateList): null pointer error ([居戎氏](https://github.com/rime/weasel/commit/588a31f8eedf6066e5b6a1cc7f010ed528154445))
+fix: silent installation script repeated call ([居戎氏](https://github.com/rime/weasel/commit/150c5608ba5338cedf124a0c1adf2caf5948a6cf))
+fix: silent installation script typo ([Yh793](https://github.com/rime/weasel/commit/c599f2e67ab26dac3f77066d4d57d9295092be96))
+fix: fix unexpected crash in some applications (#1458) ([Alfred Lieu](https://github.com/rime/weasel/commit/3f1e05b255867b8d9d31212fe840bcfa8f23b50c))
+fix: candidate ui can't be drawn correctly after GPU reset ([fxliang](https://github.com/rime/weasel/commit/37c8fa161a221a263bb439a1158ba401c0cf90a3))
+
+#### Commits
+remove duplicated branch ([Qijia Liu](https://github.com/rime/weasel/commit/78e20ab7893ffe07904ef10eebe55c27bb05cc2a))
+refactorï(RimeWithWeasel) simplify color parsing function ([fxliang](https://github.com/rime/weasel/commit/836dc9e35c25564fb4b8ab95e575afa4454ee5f3))
+
+<a name="0.16.3"></a>
+## [0.16.3](https://github.com/rime/weasel/compare/0.16.2...0.16.3)(2024-10-04)
+
+#### Bug Fixes
+* release channel feed_url not correct. ([fxliang](https://github.com/rime/weasel/commit/0c8bb0f01a929f46160482ae2f4492bed560b7b9))
+* invalid quick return ([Xuesong Peng](https://github.com/rime/weasel/commit/4da263727e16362f01054f6f0bb7522e83ae1e06))
+
+#### Chores
+* add update\bump-version.ps1 to bump version in powershell, when clog is not required ([fxliang](https://github.com/rime/weasel/commit/8770fb3ed1b4341b7875c1d60e98bfa5b42f8ac7))
+* update bump-version.sh, appcast.xml and testing-appcast.xml[skip ci] ([fxliang](https://github.com/rime/weasel/commit/91d5e4e224a0d73b8303a6ce10f03c71dace5cdd))
+
+#### Continuous Integration
+* release and update testing appcast only in rime/weasel ([fxliang](https://github.com/rime/weasel/commit/4af83b6e17f7c3cf78257dd300f4adadbffa1083))
+
+<a name="0.16.2"></a>
+## [0.16.2](https://github.com/rime/weasel/compare/0.16.1...0.16.2) (2024-09-28)
+
+#### 安裝須知
+
+**⚠️如您由0.16.0之前的版本升級，由於參數變化，安裝小狼毫前請保存好文件資料，於安裝後重啓或註銷 Windows，否則正在使用小狼毫的應用可能會崩潰。**
+
+**⚠如您由0.16.0之前的版本升級，請確認您的 `installation.yaml` 文件編碼爲 `UTF-8`, 否則如您在其中修改了非 ASCII 字符內容的路徑時，有可能會引起未明錯誤。**
+
+#### 主要更新
+* 新特性：支持自動檢查更新使用測試通道，使用`WeaselSetup.exe`參數可修改，`/testing`使用測試通道，`/release`使用發佈版本，默認後者；
+* 新特性：`WeaselSetup.exe`參數設置界面語言，设置后覆盖区域设置的自动检测。`/lt`設置爲繁體中文界面，`/ls` 設置爲簡體中文界面，`/le`設置爲英文界面
+* 新特性：`WeaselSetup.exe`參數設置是否使用自動檢查更新，`/du`禁用自動檢查更新，`/eu`使用自動檢查更新
+* 新特性：安裝器彈窗提示設置是否自動檢查升級
+* 新特性：開關IME消息響應狀態可配置，`WeaselSetup.exe`參數`/toggleime`設置關閉鍵盤（原版本狀態），`/toggleascii`切換`ascii_mode`,安裝默認後者 #1364
+* 新特性：支持xmake 2.9.4以上版本構建，使用`xbuild.bat`開展，相關參數基本同`build.bat`, 使用`xbuild.bat commands`可生成`compile_commands.json`便於lsp使用，`xbuild.bat clean`可清空xmake構建 #1360
+* 新特性：支持`Caps_Lock` 按鍵binding（如選重）,需将`key_binder`置于`ascii_composer`之前
+* 使能TSF dll中的WER
+* nightly 構建後自動更新rime/home頁面更新測試通道appcast
+* 升級lint檢查使用的llvm最低版本至18.1.6, 更新ci脚本检查更新llvm
+
+#### Bug 修復
+
+* 修復安裝器在系統未滿足要求時未中斷的問題
+* 修復重新安裝時舊的安於路徑未保持的問題
+* 修復界面語言根據區域格式未正確設置的問題
+* 修復IPC通信時因新舊版本變更引起的異常崩潰的問題
+* 修正代碼編碼格式
+* 修復清空舊log文件
+* 修復控制面板卸載界面中的圖標顯示問題
+* 修復`style/hover_type`爲`"semi_hilite"`在首候選時的顯示異常問題
+* 修復新版librime產物未能直接替換使用問題
+* 禁用IPC通信的異步機制，修復一些因異步機制引發的應用異常
+* 修復構建腳本不能重生成正確的版本信息問題
+* 修復一些vs工程配置設置，處理一些deprecated API警告
+
+
+<a name="0.16.1"></a>
+## [0.16.1](https://github.com/rime/weasel/compare/0.16.0...0.16.1) (2024-06-06)
+
+
+#### 安裝須知
+
+**⚠️如您由0.16.0之前的版本升級，由於參數變化，安裝小狼毫前請保存好文件資料，於安裝後重啓或註銷 Windows，否則正在使用小狼毫的應用可能會崩潰。**
+
+**⚠如您由0.16.0之前的版本升級，請確認您的 `installation.yaml` 文件編碼爲 `UTF-8`, 否則如您在其中修改了非 ASCII 字符內容的路徑時，有可能會引起未明錯誤。**
+
+#### 主要更新
+* 爲`WeaselServer.exe`使能Windows Error Reporting, 提供對應的`WeaselServer.pdb`文件, 在`WeaselServer.exe`崩潰時可以生成dmp報告文件在日誌文件夾中
+* 提供`WeaselServer.exe`守護，在服務崩潰後6個按鍵事件（三次擊鍵Down&Up)後拉起服務
+* 新增英文界面語言
+* 更新7z和curl到最新版本，修復一些因爲7z的bug引起的問題
+* 優化預覽圖PNG文件大小
+* 新增語言欄菜單，打開日誌文件夾，調整日誌文件夾路徑爲`%TEMP%\rime.weasel`,方便查閱管理
+* 異步處理消息，避免服務崩潰時長時間未響應引起客戶端程序崩潰
+* 不在服務中部署方案，避免在守護拉起服務進入長耗時部署引起的僵死問題
+
+#### Bug 修復
+
+* 修復自動折行未正確處理標點符號（標點在折行後最前）的問題
+* 修復`vim-mode`下的typo引起的`<C-C>`無法生效問題
+* 修復部署消息未更新問題
+* 修復卸載小狼毫時意外安裝語言包問題
+* 修復`semi_hilite`下的UI未正確響應問題, `semi_hilite`顏色調整爲高亮色的半透明度狀態，改善體驗
+* 減少不必要的服務端UI更新，提高性能減少服務崩潰機率
+* 修復在非`DPI=96`的副屏上響應慢的問題
+* 修復在高分屏上layout參數未dpi aware問題
+* 修復Windows 11下Chrome等瀏覽器中非激活光標狀態下的按鍵響應異常問題
+* 修復64位系統下默認安裝路徑不準確的問題
+
+
+
+<a name="0.16.0"></a>
+## [0.16.0](https://github.com/rime/weasel/compare/0.15.0...0.16.0) (2024-05-14)
+
+
+#### 安裝須知
+
+**⚠️由於參數變化，安裝小狼毫前請保存好文件資料，於安裝後重啓或註銷 Windows，否則正在使用小狼毫的應用可能會崩潰。**
+
+**⚠請確認您的 `installation.yaml` 文件編碼爲 `UTF-8`, 否則如您在其中修改了非 ASCII 字符內容的路徑時，有可能會引起未明錯誤。**
+
+#### 主要更新
+
+* 升級核心算法庫至 [librime 1.11.2](https://github.com/rime/librime/releases/tag/1.11.2)
+* 改善輸入法病毒誤報問題
+* 新增 64 位算法服務程序，支持 64 位 librime，支持大內存（可部署大規模詞庫方案）
+* 支持 arm/arm64 架構
+* 單安裝包支持 win32/x64/arm/arm64 架構系統的自動釋放文件
+* 32 位算法服務增加 LARGE ADDRESS AWARE 支持
+* 升級 boost 算法庫至 1.84.0
+* IME改爲可選項，默認不安裝
+* 棄用 `weaselt*.dll`，增加註冊香港、澳門、新加坡區域語言配置（默認未啓用，需在控制面板/設置中手工添加）；支持簡繁體小狼毫同時使能
+* 棄用 `weaselt*.ime`
+* 移除 `pyweasel`
+* 候選窗口 UI 內存優化
+* 改善候選窗口 UI 繪製性能
+* 升級 WTL 庫至 10.0，gdi+ 至 1.1
+* 每顯示器 dpi aware，自適應不同顯示器不同 dpi 設定變化
+* 更新高清圖標
+* 增大 IPC 數據長度限制至 64k，支持長候選
+* 升級 plum
+* 應用界面及菜單簡繁體自動適應
+* `app_options` 中應用名大小寫不敏感
+* 字體抗鋸齒設定參數 `style/antialias_mode: {force_dword|cleartype|grayscale|aliased|default}`
+* ASCII狀態提示跟隨鼠標光標設定 `style/ascii_tip_follow_cursor: bool`
+* 新增參數 `style/layout/hilite_padding_x: int`、`style/layout/hilite_padding_y: int`，支持分別設置xy向的 padding
+* 新增參數 `schema/full_icon: string`, `schema/half_icon: string`，支持在方案中設定全半角圖標
+* 新增參數 `style/text_orientation: "horizontal" | "vertical"`, 與 `style/vertical_text: bool` 冗餘，設定文字繪製方向，兼容 squirrel 參數
+* 新增參數 `style/paging_on_scroll: bool`，可設定滾輪相應類型（翻頁或切換前後候選）
+* 新增參數，Windows10 1809後版本的Windows，支持 `style/color_scheme_dark: string` 設定暗色模式配色
+* 新增參數 `style/candidate_abbreviate_length: int`，支持候選字數超限時縮略顯示
+* 新增參數 `style/click_to_capture: bool` 設定鼠標點擊是否截圖
+* 新增參數 `show_notifications_time: int` 可設定提示顯示時間，單位 ms；設置 0 時不顯示提示
+* 新增參數 `show_notifications: bool` 或 `show_notifications: 開關列表 | "schema"`，可定製是否顯示切換提示、顯示那些切換提示
+* 新增參數 `style/layout/baseline: int` 和 `style/layout/linespacing: int`，可自行調整參數修復候選窗高度跳躍閃爍問題
+* 棄用 `style/mouse_hover_ms`；新增 `style/hover_type: "none"|"semi_hilite"|"hilite"`，改善鼠標懸停相應體驗
+* 新增參數 `global_ascii: bool`, 支持全局 ascii 模式
+* 新增 `app_options`，支持應用專用 `vim_mode: bool`，支持常見 vim 切換 normal 模式按鍵時，切換到 `ascii_mode`
+* 新增 `app_options`，支持應用專用 `inline_preedit: bool` 設定，優先級高於方案內設定，高於 `weasel.yaml` 中的設定
+* 支持命令行設置小狼毫 `ascii_mode` 狀態，`WeaselServer.exe /ascii`，`WeaselServer.exe /nascii`
+* 支持設置 `comment_text_color`、`hilited_comment_text_color` 透明來隱藏對應文字顯示
+* `hilited_mark_color` 非透明，`mark_text` 爲空字符串時，類 windowns 11 的高亮標識
+* 切換方案後，提示方案圖標和方案名字
+* 支持全部 switch 提示使用方案內設定的 label
+* WeaselSetup通過打開目錄窗口設置用戶目錄路徑
+* 新增支持方案內定義方案專用配色
+* 支持 imtip
+* 增加類微軟拼音的高亮標識在鼠標點擊時的動態
+* 支持在字體設定任一分組中設置字體整體的字重或字形
+* 優化點擊選字邏輯
+* 豎直佈局反轉時，互換上下方向鍵
+* 候選窗超出下方邊界時，在當前合成結束前保持在輸入位置上方，減少候選窗口高度變小時潛在的窗口上下跳動
+* 調整 TSF 光標位置（`inline_preedit: false` 時），減少光標閃爍
+* WeaselSetup 修改用戶目錄路徑（已安裝時）
+* 語言欄新增菜單，重啓服務
+* IPC 報文轉義 `\n`、`\t`，不再因 `\n` 引發應用崩潰
+* 使用 clang-format 格式化代碼，統一代碼風格
+* 自動文件版本信息
+* 測試項目 test 只在 debug 配置狀態下編譯構建
+
+#### Bug 修復
+
+* 修復 word 365 中候選窗閃爍無法正常顯示的問題
+* 修復 word 行尾輸入時候選窗反覆跳動問題
+* 修復 word 中無法點擊選詞問題
+* 修復 excel 等應用中，第一鍵 keydown 時未及時彈出候選窗問題
+* 修復導出詞典數據後引起的多個 explorer 進程的問題，優化對應對話框界面顯示
+* 修復打開用戶目錄，程序目錄引起的多個 explorer.exe 進程問題，支持服務未啓動時打開這些目錄
+* 修復系統托盤重啓後未及時顯示的問題
+* 修復 `style/layout/min_width` 在部分佈局下未生效問題
+* 修復 preedit 寬高計算錯誤問題
+* 修復翻頁按鈕在豎直佈局反轉時位置錯誤
+* 修復豎直佈局帶非空 mark_text 時的計算錯誤
+* 修復 composing 中候選窗隨文字移動問題
+* 修復 wezterm gpu 模式下無法使用問題
+* 修復 `style/inline_preedit: true` 時第一鍵輸入時候選窗位置錯誤
+* 修復算法服務單例運行
+* 修復調用 WeaselServer.exe 未正常重啓服務問題
+* 修復偶發的顯卡關聯文字空白問題
+* 修復部署過程中如按鍵輸入引發的重複發出 tip 提示窗問題
+* 修復部分方案中的圖標顯示（`english.schema.yaml`）
+* 修復 `preedit_type: preview` 時的光標錯誤問題
+* 修復 `shadow_color` 透明時截圖尺寸過大問題，減小截圖尺寸
+* 修復天園地方時，高亮候選圓角半徑不正確問題
+* 修復某些狀態下天園地方的 preedit 背景色圓角異常問題
+* 修復候選尾部空白字符引起的佈局計算錯誤問題
+* 修復 mark_text 繪製鋸齒問題
+* 修復靜默安裝彈窗問題
+* 修復 librime-preedit 引起的應用崩潰問題
+* 修復 plum 用戶目錄識別錯誤問題
+* 修復安裝後未在控制面板中添加輸入法、卸載後未刪除控制面板中的輸入法清單問題
+* 修復一些其他已知的 bug
+
+#### 已知問題
+
+* 部分應用仍存在輸入法無法輸入文字或響應異常的問題
+* WeaselServer 仍可能發生崩潰
+* 仍有極少部分防病毒軟件可能誤報病毒
+
+
+
 <a name="0.15.0"></a>
-## [0.15.0](https://github.com/rime/weasel/compare/0.15.0...0.14.3) (2023-06-06)
+## [0.15.0](https://github.com/rime/weasel/compare/0.14.3...0.15.0) (2023-06-06)
 
 
 #### 安裝須知
@@ -95,6 +395,8 @@
 * 部分應用仍存在輸入法無法輸入文字的問題
 * WeaselServer 仍可能發生崩潰
 * 部分防病毒軟件可能誤報病毒
+
+
 
 <a name="0.14.3"></a>
 ## 0.14.3 (2019-06-22)
@@ -868,3 +1170,4 @@
 * 以Python開發的實驗版本
 * 獨創「拼寫運算」技術
 * 預裝標調拼音、註音、粵拼、吳語等多種輸入方案
+

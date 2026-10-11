@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Register.h"
 #include <strsafe.h>
+#include <WeaselUtility.h>
 
 #define CLSID_STRLEN 38  // strlen("{xxxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx}")
 
@@ -41,96 +42,70 @@ HKL FindIME(LANGID langid) {
 }
 
 BOOL RegisterProfiles() {
+#define CHECK_HR(hr) \
+  if (FAILED(hr))    \
+  return FALSE
+
+  CComPtr<ITfInputProcessorProfileMgr> pInputProcessorProfileMgr;
+  CHECK_HR(pInputProcessorProfileMgr.CoCreateInstance(
+      CLSID_TF_InputProcessorProfiles, NULL, CLSCTX_ALL));
+  WCHAR szProfile[100];
+  std::wstring profile{};
+  DWORD dwSize = GetEnvironmentVariable(L"TEXTSERVICE_PROFILE", szProfile,
+                                        ARRAYSIZE(szProfile));
+  if (dwSize > 0) {
+    profile = szProfile;
+  }
+  BOOL hansEnable = (profile == L"hans");
+  BOOL hantEnable = (profile == L"hant");
+  BOOL hkEnable = (profile == L"hongkong");
+  BOOL macauEnable = (profile == L"macau");
+  BOOL sgEnable = (profile == L"singapore");
+  // fallback hans enable
+  hansEnable = hansEnable || (!hantEnable && !hansEnable && !hkEnable &&
+                              !macauEnable && !sgEnable);
+
+  const auto text_service_desc = get_weasel_ime_name();
+  const WCHAR* text_service_desc_str = text_service_desc.c_str();
+  ULONG text_service_desc_len = text_service_desc.size() * sizeof(wchar_t);
+
   WCHAR achIconFile[MAX_PATH];
   ULONG cchIconFile =
       GetModuleFileNameW(g_hInst, achIconFile, ARRAYSIZE(achIconFile));
-  HRESULT hr;
 
-  {
-    CComPtr<ITfInputProcessorProfileMgr> pInputProcessorProfileMgr;
-    hr = pInputProcessorProfileMgr.CoCreateInstance(
-        CLSID_TF_InputProcessorProfiles, NULL, CLSCTX_ALL);
-    if (FAILED(hr))
-      return FALSE;
-    WCHAR szProfile[100];
-    DWORD dwSize = GetEnvironmentVariable(L"TEXTSERVICE_PROFILE", szProfile,
-                                          ARRAYSIZE(szProfile));
-    BOOL hansEnable = FALSE;
-    BOOL hantEnable = FALSE;
+  const auto register_profile = [&](LANGID langId, HKL hkl, BOOL enable) {
+    return pInputProcessorProfileMgr->RegisterProfile(
+        c_clsidTextService, langId, c_guidProfile, text_service_desc_str,
+        text_service_desc_len, achIconFile, cchIconFile, TEXTSERVICE_ICON_INDEX,
+        hkl, 0, enable, 0);
+  };
 
-    if (dwSize > 0 && wcscmp(szProfile, L"hans") == 0)
-      hansEnable = TRUE;
-    if (dwSize > 0 && wcscmp(szProfile, L"hant") == 0)
-      hantEnable = TRUE;
-    if (!hantEnable && !hansEnable)
-      hansEnable = TRUE;
-
-    hr = pInputProcessorProfileMgr->RegisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID, c_guidProfile, TEXTSERVICE_DESC,
-        (ULONG)wcslen(TEXTSERVICE_DESC), achIconFile, cchIconFile,
-        TEXTSERVICE_ICON_INDEX, FindIME(TEXTSERVICE_LANGID), 0, hansEnable, 0);
-    if (FAILED(hr))
-      goto ExitError;
-
-    hr = pInputProcessorProfileMgr->RegisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_HANT, c_guidProfile,
-        TEXTSERVICE_DESC, (ULONG)wcslen(TEXTSERVICE_DESC), achIconFile,
-        cchIconFile, TEXTSERVICE_ICON_INDEX, FindIME(TEXTSERVICE_LANGID_HANT),
-        0, hantEnable, 0);
-    if (FAILED(hr))
-      goto ExitError;
-    // WeaselIME not support these languages, so HKL is NULL
-    hr = pInputProcessorProfileMgr->RegisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_HONGKONG, c_guidProfile,
-        TEXTSERVICE_DESC, (ULONG)wcslen(TEXTSERVICE_DESC), achIconFile,
-        cchIconFile, TEXTSERVICE_ICON_INDEX, NULL, 0, FALSE, 0);
-    if (FAILED(hr))
-      goto ExitError;
-
-    hr = pInputProcessorProfileMgr->RegisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_MACAU, c_guidProfile,
-        TEXTSERVICE_DESC, (ULONG)wcslen(TEXTSERVICE_DESC), achIconFile,
-        cchIconFile, TEXTSERVICE_ICON_INDEX, NULL, 0, FALSE, 0);
-    if (FAILED(hr))
-      goto ExitError;
-
-    hr = pInputProcessorProfileMgr->RegisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_SINGAPORE, c_guidProfile,
-        TEXTSERVICE_DESC, (ULONG)wcslen(TEXTSERVICE_DESC), achIconFile,
-        cchIconFile, TEXTSERVICE_ICON_INDEX, NULL, 0, FALSE, 0);
-    if (FAILED(hr)) {
-    ExitError:
-      pInputProcessorProfileMgr.Release();
-      return FALSE;
-    }
-    pInputProcessorProfileMgr.Release();
-  }
+  const auto hkl_hans = FindIME(TEXTSERVICE_LANGID_HANS);
+  const auto hkl_hant = FindIME(TEXTSERVICE_LANGID_HANT);
+  CHECK_HR(register_profile(TEXTSERVICE_LANGID_HANS, hkl_hans, hansEnable));
+  CHECK_HR(register_profile(TEXTSERVICE_LANGID_HANT, hkl_hant, hantEnable));
+  CHECK_HR(register_profile(TEXTSERVICE_LANGID_HONGKONG, NULL, hkEnable));
+  CHECK_HR(register_profile(TEXTSERVICE_LANGID_MACAU, NULL, macauEnable));
+  CHECK_HR(register_profile(TEXTSERVICE_LANGID_SINGAPORE, NULL, sgEnable));
+#undef CHECK_HR
 
   return TRUE;
 }
 
 void UnregisterProfiles() {
-  HRESULT hr;
-
-  {
-    CComPtr<ITfInputProcessorProfileMgr> pInputProcessorProfileMgr;
-    hr = pInputProcessorProfileMgr.CoCreateInstance(
-        CLSID_TF_InputProcessorProfiles, NULL, CLSCTX_ALL);
-    if (FAILED(hr))
-      return;
-
-    hr = pInputProcessorProfileMgr->UnregisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID, c_guidProfile, 0);
-    hr = pInputProcessorProfileMgr->UnregisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_HANT, c_guidProfile, 0);
-    hr = pInputProcessorProfileMgr->UnregisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_HONGKONG, c_guidProfile, 0);
-    hr = pInputProcessorProfileMgr->UnregisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_MACAU, c_guidProfile, 0);
-    hr = pInputProcessorProfileMgr->UnregisterProfile(
-        c_clsidTextService, TEXTSERVICE_LANGID_SINGAPORE, c_guidProfile, 0);
-    pInputProcessorProfileMgr.Release();
-  }
+  CComPtr<ITfInputProcessorProfileMgr> pInputProcessorProfileMgr;
+  if (FAILED(pInputProcessorProfileMgr.CoCreateInstance(
+          CLSID_TF_InputProcessorProfiles, NULL, CLSCTX_ALL)))
+    return;
+  const auto unregister_profile = [&](LANGID id) {
+    pInputProcessorProfileMgr->UnregisterProfile(c_clsidTextService, id,
+                                                 c_guidProfile, 0);
+  };
+  unregister_profile(TEXTSERVICE_LANGID_HANS);
+  unregister_profile(TEXTSERVICE_LANGID_HANT);
+  unregister_profile(TEXTSERVICE_LANGID_HONGKONG);
+  unregister_profile(TEXTSERVICE_LANGID_MACAU);
+  unregister_profile(TEXTSERVICE_LANGID_SINGAPORE);
 }
 
 const GUID SupportCategories0[] = {
@@ -146,40 +121,26 @@ const GUID SupportCategories0[] = {
     GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER, GUID_TFCAT_DISPLAYATTRIBUTEPROPERTY};
 
 BOOL RegisterCategories() {
-  ITfCategoryMgr* pCategoryMgr;
-  HRESULT hr;
-
-  hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
-                        IID_ITfCategoryMgr, (void**)&pCategoryMgr);
-  if (hr != S_OK)
+  CComPtr<ITfCategoryMgr> pCategoryMgr = NULL;
+  if (FAILED(CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
+                              IID_ITfCategoryMgr, (LPVOID*)&pCategoryMgr)))
     return FALSE;
-
-  BOOL flag = TRUE;
   for (const auto& guid : SupportCategories0) {
-    hr = pCategoryMgr->RegisterCategory(c_clsidTextService, guid,
-                                        c_clsidTextService);
-    if (hr != S_OK)
-      flag = FALSE;
+    if (FAILED(pCategoryMgr->RegisterCategory(c_clsidTextService, guid,
+                                              c_clsidTextService)))
+      return FALSE;
   }
-
-  pCategoryMgr->Release();
-  return flag;
+  return TRUE;
 }
 
 void UnregisterCategories() {
-  ITfCategoryMgr* pCategoryMgr;
-  HRESULT hr;
-
-  hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
-                        IID_ITfCategoryMgr, (void**)&pCategoryMgr);
-  if (FAILED(hr))
+  CComPtr<ITfCategoryMgr> pCategoryMgr = NULL;
+  if (FAILED(CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
+                              IID_ITfCategoryMgr, (LPVOID*)&pCategoryMgr)))
     return;
-
   for (const auto& guid : SupportCategories0)
     pCategoryMgr->UnregisterCategory(c_clsidTextService, guid,
                                      c_clsidTextService);
-
-  pCategoryMgr->Release();
 }
 
 static BOOL CLSIDToStringA(REFGUID refGUID, char* pchA) {

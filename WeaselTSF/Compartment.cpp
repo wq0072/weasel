@@ -5,9 +5,10 @@
 #include <functional>
 #include "ResponseParser.h"
 #include "CandidateList.h"
+#include "LanguageBar.h"
 
-STDAPI CCompartmentEventSink::QueryInterface(REFIID riid,
-                                             _Outptr_ void** ppvObj) {
+STDMETHODIMP CCompartmentEventSink::QueryInterface(REFIID riid,
+                                                   _Outptr_ void** ppvObj) {
   if (ppvObj == nullptr)
     return E_INVALIDARG;
 
@@ -26,11 +27,11 @@ STDAPI CCompartmentEventSink::QueryInterface(REFIID riid,
   return E_NOINTERFACE;
 }
 
-STDAPI_(ULONG) CCompartmentEventSink::AddRef() {
+STDMETHODIMP_(ULONG) CCompartmentEventSink::AddRef() {
   return ++_refCount;
 }
 
-STDAPI_(ULONG) CCompartmentEventSink::Release() {
+STDMETHODIMP_(ULONG) CCompartmentEventSink::Release() {
   LONG cr = --_refCount;
 
   assert(_refCount >= 0);
@@ -42,7 +43,7 @@ STDAPI_(ULONG) CCompartmentEventSink::Release() {
   return cr;
 }
 
-STDAPI CCompartmentEventSink::OnChange(_In_ REFGUID guidCompartment) {
+STDMETHODIMP CCompartmentEventSink::OnChange(_In_ REFGUID guidCompartment) {
   return _callback(guidCompartment);
 }
 
@@ -242,13 +243,27 @@ void WeaselTSF::_UninitCompartment() {
 
 HRESULT WeaselTSF::_HandleCompartment(REFGUID guidCompartment) {
   if (IsEqualGUID(guidCompartment, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE)) {
-    BOOL isOpen = _IsKeyboardOpen();
-    // clear composition when close keyboard
-    if (!isOpen && _pEditSessionContext) {
-      m_client.ClearComposition();
-      _EndComposition(_pEditSessionContext, true);
+    if (_isToOpenClose) {
+      BOOL isOpen = _IsKeyboardOpen();
+      // clear composition when close keyboard
+      if (!isOpen && _pEditSessionContext) {
+        m_client.ClearComposition();
+        _EndComposition(_pEditSessionContext, true);
+      }
+      _EnableLanguageBar(isOpen);
+      _UpdateLanguageBar(_status);
+    } else {
+      _status.ascii_mode = !_status.ascii_mode;
+      _SetKeyboardOpen(true);
+      if (_pLangBarButton && _pLangBarButton->IsLangBarDisabled())
+        _EnableLanguageBar(true);
+      _HandleLangBarMenuSelect(_status.ascii_mode
+                                   ? ID_WEASELTRAY_ENABLE_ASCII
+                                   : ID_WEASELTRAY_DISABLE_ASCII);
+      if (_pEditSessionContext)
+        m_client.ClearComposition();
+      _UpdateLanguageBar(_status);
     }
-    _EnableLanguageBar(isOpen);
   } else if (IsEqualGUID(guidCompartment,
                          GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION)) {
     BOOL isOpen = _IsKeyboardOpen();

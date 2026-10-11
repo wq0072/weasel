@@ -18,8 +18,7 @@
 #include "WeaselDeployer.h"
 
 static void CreateFileIfNotExist(std::string filename) {
-  std::filesystem::path file_path =
-      WeaselUserDataPath() / string_to_wstring(filename, CP_UTF8);
+  std::filesystem::path file_path = WeaselUserDataPath() / u8tow(filename);
   DWORD dwAttrib = GetFileAttributes(file_path.c_str());
   if (!(INVALID_FILE_ATTRIBUTES != dwAttrib &&
         0 == (dwAttrib & FILE_ATTRIBUTE_DIRECTORY))) {
@@ -34,22 +33,23 @@ Configurator::Configurator() {
 
 void Configurator::Initialize() {
   RIME_STRUCT(RimeTraits, weasel_traits);
-  std::string shared_dir =
-      wstring_to_string(WeaselSharedDataPath().wstring(), CP_UTF8);
-  std::string user_dir =
-      wstring_to_string(WeaselUserDataPath().wstring(), CP_UTF8);
+  std::string shared_dir = wtou8(WeaselSharedDataPath().wstring());
+  std::string user_dir = wtou8(WeaselUserDataPath().wstring());
   weasel_traits.shared_data_dir = shared_dir.c_str();
   weasel_traits.user_data_dir = user_dir.c_str();
   weasel_traits.prebuilt_data_dir = weasel_traits.shared_data_dir;
-  std::string distribution_name = wstring_to_string(WEASEL_IME_NAME, CP_UTF8);
+  std::string distribution_name = wtou8(get_weasel_ime_name());
   weasel_traits.distribution_name = distribution_name.c_str();
   weasel_traits.distribution_code_name = WEASEL_CODE_NAME;
   weasel_traits.distribution_version = WEASEL_VERSION;
   weasel_traits.app_name = "rime.weasel";
-  RimeSetup(&weasel_traits);
-
+  std::string log_dir = WeaselLogPath().u8string();
+  weasel_traits.log_dir = log_dir.c_str();
+  RimeApi* rime_api = rime_get_api();
+  assert(rime_api);
+  rime_api->setup(&weasel_traits);
   LOG(INFO) << "WeaselDeployer reporting.";
-  RimeDeployerInitialize(NULL);
+  rime_api->deployer_initialize(NULL);
 }
 
 static bool configure_switcher(RimeLeversApi* api,

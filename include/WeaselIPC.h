@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <functional>
 #include <memory>
+#include <KeyEvent.h>
 
 #define WEASEL_IPC_WINDOW L"WeaselIPCWindow_1.0"
 #define WEASEL_IPC_PIPE_NAME L"WeaselNamedPipe"
@@ -34,6 +35,10 @@ enum WEASEL_IPC_COMMAND {
   WEASEL_IPC_LAST_COMMAND
 };
 
+// Posted by WeaselTrayIcon to the server window so that Shell_NotifyIcon runs
+// on the server message thread instead of a pipe worker thread.
+#define WM_WEASEL_SERVICE_NOTIFY (WEASEL_IPC_LAST_COMMAND + 200)
+
 namespace weasel {
 struct PipeMessage {
   WEASEL_IPC_COMMAND Msg;
@@ -45,17 +50,6 @@ struct IPCMetadata {
   enum { WINDOW_CLASS_LENGTH = 64 };
   UINT32 server_hwnd;
   WCHAR server_window_class[WINDOW_CLASS_LENGTH];
-};
-
-struct KeyEvent {
-  UINT keycode : 16;
-  UINT mask : 16;
-  KeyEvent() : keycode(0), mask(0) {}
-  KeyEvent(UINT _keycode, UINT _mask) : keycode(_keycode), mask(_mask) {}
-  KeyEvent(UINT x) { *reinterpret_cast<UINT*>(this) = x; }
-  operator UINT32 const() const {
-    return *reinterpret_cast<UINT32 const*>(this);
-  }
 };
 
 // 處理請求之物件
@@ -163,7 +157,7 @@ class Server {
   virtual ~Server();
 
   // 初始化服务
-  int Start();
+  HWND Start();
   // 结束服务
   int Stop();
   // 消息循环
@@ -172,6 +166,10 @@ class Server {
   void SetRequestHandler(RequestHandler* pHandler);
   void AddMenuHandler(UINT uID, CommandHandler handler);
   HWND GetHWnd();
+
+  // Callback invoked on the server message thread when a tray icon refresh is
+  // requested from a pipe worker thread.
+  void SetTrayRefreshCallback(std::function<void()> callback);
 
  private:
   ServerImpl* m_pImpl;

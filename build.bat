@@ -9,23 +9,29 @@ if exist env.bat call env.bat
 if not defined WEASEL_ROOT set WEASEL_ROOT=%CD%
 
 if not defined VERSION_MAJOR set VERSION_MAJOR=0
-if not defined VERSION_MINOR set VERSION_MINOR=15
-if not defined VERSION_PATCH set VERSION_PATCH=0
+if not defined VERSION_MINOR set VERSION_MINOR=17
+if not defined VERSION_PATCH set VERSION_PATCH=4
 
 if not defined WEASEL_VERSION set WEASEL_VERSION=%VERSION_MAJOR%.%VERSION_MINOR%.%VERSION_PATCH%
 if not defined WEASEL_BUILD set WEASEL_BUILD=0
 
-if not defined PRODUCT_VERSION (
-  rem use numeric build version for release build
-  set PRODUCT_VERSION=%WEASEL_VERSION%.%WEASEL_BUILD%
-  rem for non-release build, try to use git commit hash as product build version
-  if not defined RELEASE_BUILD (
-    rem check if git is installed and available, then get the short commit id of head
-    git --version >nul 2>&1
-    if not errorlevel 1 (
-      rem get short commmit id of head
-      for /F %%i in ('git rev-parse --short HEAD') do (set PRODUCT_VERSION=%WEASEL_VERSION%-%%i)
+rem use numeric build version for release build
+set PRODUCT_VERSION=%WEASEL_VERSION%.%WEASEL_BUILD%
+rem for non-release build, try to use git commit hash as product build version
+if not defined RELEASE_BUILD (
+  rem check if git is installed and available, then get the short commit id of head
+  git --version >nul 2>&1
+  if not errorlevel 1 (
+    for /f "delims=" %%i in ('git tag --sort=-creatordate ^| findstr /r "%WEASEL_VERSION%"') do (
+      set LAST_TAG=%%i
+      goto found_tag
     )
+    :found_tag
+    for /f "delims=" %%i in ('git rev-list %LAST_TAG%..HEAD --count') do (
+      set WEASEL_BUILD=%%i
+    )
+    rem get short commmit id of head
+    for /F %%i in ('git rev-parse --short HEAD') do (set PRODUCT_VERSION=%WEASEL_VERSION%.%WEASEL_BUILD%.%%i)
   )
 )
 
@@ -38,6 +44,11 @@ echo WEASEL_BUILD=%WEASEL_BUILD%
 echo WEASEL_ROOT=%WEASEL_ROOT%
 echo WEASEL_BUNDLED_RECIPES=%WEASEL_BUNDLED_RECIPES%
 echo.
+
+if defined GITHUB_ENV (
+	setlocal enabledelayedexpansion
+	echo git_ref_name=%PRODUCT_VERSION%>>!GITHUB_ENV!
+)
 
 if defined BOOST_ROOT (
   if exist "%BOOST_ROOT%\boost" goto boost_found
@@ -66,7 +77,6 @@ set build_boost=0
 set boost_build_variant=release
 set build_data=0
 set build_opencc=0
-set build_hant=0
 set build_rime=0
 set rime_build_variant=release
 set build_weasel=0
@@ -90,7 +100,6 @@ rem parse the command line options
   if "%1" == "boost" set build_boost=1
   if "%1" == "data" set build_data=1
   if "%1" == "opencc" set build_opencc=1
-  if "%1" == "hant" set build_hant=1
   if "%1" == "rime" set build_rime=1
   if "%1" == "librime" set build_rime=1
   if "%1" == "weasel" set build_weasel=1
@@ -100,7 +109,6 @@ rem parse the command line options
     set build_boost=1
     set build_data=1
     set build_opencc=1
-    set build_hant=1
     set build_rime=1
     set build_weasel=1
     set build_installer=1
@@ -188,30 +196,20 @@ cscript.exe render.js weasel.props %WEASEL_PROJECT_PROPERTIES%
 
 del msbuild*.log
 
+if defined SDKVER set build_sdk_option=/p:WindowsTargetPlatformVersion=%SDKVER%
+if not defined SDKVER set build_sdk_option=
+
 if %build_arm64% == 1 (
-  if %build_hant% == 1 (
-    msbuild.exe weasel.sln %build_option% /p:Configuration=ReleaseHant /p:Platform="ARM" /fl8
-    if errorlevel 1 goto error
-    msbuild.exe weasel.sln %build_option% /p:Configuration=ReleaseHant /p:Platform="ARM64" /fl7
-    if errorlevel 1 goto error
-  )
 
-  msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="ARM" /fl6
+  msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="ARM" /fl6 %build_sdk_option%
   if errorlevel 1 goto error
-  msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="ARM64" /fl5
+  msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="ARM64" /fl5 %build_sdk_option%
   if errorlevel 1 goto error
 )
 
-if %build_hant% == 1 (
-  msbuild.exe weasel.sln %build_option% /p:Configuration=ReleaseHant /p:Platform="x64" /fl4
-  if errorlevel 1 goto error
-  msbuild.exe weasel.sln %build_option% /p:Configuration=ReleaseHant /p:Platform="Win32" /fl3
-  if errorlevel 1 goto error
-)
-
-msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="x64" /fl2
+msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="x64" /fl2 %build_sdk_option%
 if errorlevel 1 goto error
-msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="Win32" /fl1
+msbuild.exe weasel.sln %build_option% /p:Configuration=%build_config% /p:Platform="Win32" /fl1 %build_sdk_option%
 if errorlevel 1 goto error
 
 if %build_arm64% == 1 (
@@ -222,18 +220,14 @@ if %build_arm64% == 1 (
 
   copy arm64x_wrapper\weaselARM64X.dll output
   if errorlevel 1 goto error
-  copy arm64x_wrapper\weaselARM64X.ime output
-  if errorlevel 1 goto error
 )
 
 if %build_installer% == 1 (
   "%ProgramFiles(x86)%"\NSIS\Bin\makensis.exe ^
   /DWEASEL_VERSION=%WEASEL_VERSION% ^
   /DWEASEL_BUILD=%WEASEL_BUILD% ^
+  /DPRODUCT_VERSION=%PRODUCT_VERSION% ^
   output\install.nsi
-  if not defined RELEASE_BUILD (
-    move output\archives\weasel-%WEASEL_VERSION%.%WEASEL_BUILD%-installer.exe output\archives\weasel-%PRODUCT_VERSION%-installer.exe
-  )
   if errorlevel 1 goto error
 )
 
@@ -377,7 +371,9 @@ rem ---------------------------------------------------------------------------
 
 :error
 
+cd %WEASEL_ROOT%
 echo error building weasel...
+exit /b 1
 
 :end
 cd %WEASEL_ROOT%

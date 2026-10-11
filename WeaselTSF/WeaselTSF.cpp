@@ -1,6 +1,9 @@
 ﻿#include "stdafx.h"
 
 #include <WeaselIPCData.h>
+#include <thread>
+#include <shellapi.h>
+#include <tlhelp32.h>
 #include "WeaselTSF.h"
 #include "CandidateList.h"
 #include "LanguageBar.h"
@@ -12,7 +15,7 @@ static void error_message(const WCHAR* msg) {
   DWORD now = GetTickCount();
   if (now > next_tick) {
     next_tick = now + 10000;  // (ms)
-    MessageBox(NULL, msg, TEXTSERVICE_DESC, MB_ICONERROR | MB_OK);
+    MessageBox(NULL, msg, get_weasel_ime_name().c_str(), MB_ICONERROR | MB_OK);
   }
 }
 
@@ -38,7 +41,7 @@ WeaselTSF::~WeaselTSF() {
   DllRelease();
 }
 
-STDAPI WeaselTSF::QueryInterface(REFIID riid, void** ppvObject) {
+STDMETHODIMP WeaselTSF::QueryInterface(REFIID riid, void** ppvObject) {
   if (ppvObject == NULL)
     return E_INVALIDARG;
 
@@ -65,8 +68,6 @@ STDAPI WeaselTSF::QueryInterface(REFIID riid, void** ppvObject) {
     *ppvObject = (ITfThreadFocusSink*)this;
   else if (IsEqualIID(riid, IID_ITfDisplayAttributeProvider))
     *ppvObject = (ITfDisplayAttributeProvider*)this;
-  else if (IsEqualIID(riid, IID_ITfThreadFocusSink))
-    *ppvObject = (ITfThreadFocusSink*)this;
 
   if (*ppvObject) {
     AddRef();
@@ -75,11 +76,11 @@ STDAPI WeaselTSF::QueryInterface(REFIID riid, void** ppvObject) {
   return E_NOINTERFACE;
 }
 
-STDAPI_(ULONG) WeaselTSF::AddRef() {
+STDMETHODIMP_(ULONG) WeaselTSF::AddRef() {
   return ++_cRef;
 }
 
-STDAPI_(ULONG) WeaselTSF::Release() {
+STDMETHODIMP_(ULONG) WeaselTSF::Release() {
   LONG cr = --_cRef;
 
   assert(_cRef >= 0);
@@ -90,11 +91,12 @@ STDAPI_(ULONG) WeaselTSF::Release() {
   return cr;
 }
 
-STDAPI WeaselTSF::Activate(ITfThreadMgr* pThreadMgr, TfClientId tfClientId) {
+STDMETHODIMP WeaselTSF::Activate(ITfThreadMgr* pThreadMgr,
+                                 TfClientId tfClientId) {
   return ActivateEx(pThreadMgr, tfClientId, 0U);
 }
 
-STDAPI WeaselTSF::Deactivate() {
+STDMETHODIMP WeaselTSF::Deactivate() {
   m_client.EndSession();
 
   _InitTextEditSink(com_ptr<ITfDocumentMgr>());
@@ -114,14 +116,14 @@ STDAPI WeaselTSF::Deactivate() {
 
   _tfClientId = TF_CLIENTID_NULL;
 
-  _cand->Destroy();
+  _cand->DestroyAll();
 
   return S_OK;
 }
 
-STDAPI WeaselTSF::ActivateEx(ITfThreadMgr* pThreadMgr,
-                             TfClientId tfClientId,
-                             DWORD dwFlags) {
+STDMETHODIMP WeaselTSF::ActivateEx(ITfThreadMgr* pThreadMgr,
+                                   TfClientId tfClientId,
+                                   DWORD dwFlags) {
   com_ptr<ITfDocumentMgr> pDocMgrFocus;
   _activateFlags = dwFlags;
 
@@ -169,11 +171,11 @@ ExitError:
 }
 
 STDMETHODIMP WeaselTSF::OnSetThreadFocus() {
+  std::wstring _ToggleImeOnOpenClose{};
+  RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+                    L"ToggleImeOnOpenClose", _ToggleImeOnOpenClose);
+  _isToOpenClose = (_ToggleImeOnOpenClose == L"yes");
   if (m_client.Echo()) {
-    POINT pt{};
-    ::GetCursorPos(&pt);
-    RECT rc{pt.x, pt.y, pt.x, pt.y};
-    m_client.UpdateInputPosition(rc);
     m_client.ProcessKeyEvent(0);
     weasel::ResponseParser parser(NULL, NULL, &_status, NULL, &_cand->style());
     bool ok = m_client.GetResponseData(std::ref(parser));
@@ -221,15 +223,60 @@ STDMETHODIMP WeaselTSF::OnActivated(REFCLSID clsid,
   return S_OK;
 }
 
-void WeaselTSF::_EnsureServerConnected() {
+void WeaselTSF::_Reconnect() {
+  m_client.Disconnect();
+  m_client.Connect(NULL);
+  m_client.StartSession();
+  weasel::ResponseParser parser(NULL, NULL, &_status, NULL, &_cand->style());
+  bool ok = m_client.GetResponseData(std::ref(parser));
+  if (ok) {
+    _UpdateLanguageBar(_status);
+  }
+}
+
+static unsigned int retry = 0;
+
+bool WeaselTSF::_EnsureServerConnected() {
   if (!m_client.Echo()) {
-    m_client.Disconnect();
-    m_client.Connect(NULL);
-    m_client.StartSession();
-    weasel::ResponseParser parser(NULL, NULL, &_status, NULL, &_cand->style());
-    bool ok = m_client.GetResponseData(std::ref(parser));
-    if (ok) {
-      _UpdateLanguageBar(_status);
+    _Reconnect();
+    retry++;
+    if (retry >= 6) {
+      HANDLE hMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
+      const auto count_server_process = []() -> int {
+        int count = 0;
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap == INVALID_HANDLE_VALUE)
+          return 0;
+        PROCESSENTRY32 pe;
+        pe.dwSize = sizeof(pe);
+        if (Process32First(snap, &pe)) {
+          do {
+            if (_wcsicmp(pe.szExeFile, L"WeaselServer.exe") == 0)
+              count++;
+          } while (Process32Next(snap, &pe));
+        }
+        CloseHandle(snap);
+        return count;
+      };
+      if (!m_client.Echo() && GetLastError() != ERROR_ALREADY_EXISTS &&
+          !count_server_process()) {
+        std::wstring dir = _GetRootDir();
+        std::thread th([dir, this]() {
+          ShellExecuteW(NULL, L"open", (dir + L"\\start_service.bat").c_str(),
+                        NULL, dir.c_str(), SW_HIDE);
+          // wait 500ms, then reconnect
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          _Reconnect();
+        });
+        th.detach();
+      }
+      if (hMutex) {
+        CloseHandle(hMutex);
+      }
+      retry = 0;
     }
+    return (m_client.Echo() != 0);
+  } else {
+    return true;
   }
 }

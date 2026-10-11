@@ -7,8 +7,9 @@ class VerticalLayout : public StandardLayout {
  public:
   VerticalLayout(const UIStyle& style,
                  const Context& context,
-                 const Status& status)
-      : StandardLayout(style, context, status) {}
-  virtual void DoLayout(CDCHandle dc, PDWR pDWR = NULL);
+                 const Status& status,
+                 an<D2D>& pD2D)
+      : StandardLayout(style, context, status, pD2D) {}
+  virtual void DoLayout();
 };
 };  // namespace weasel

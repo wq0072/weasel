@@ -2,6 +2,7 @@
 
 #include "resource.h"
 #include <atlstr.h>
+#include <CDialogDpiAware.h>
 
 #define MSG_BY_IDS(idInfo, idCap, uType)           \
   {                                                \
@@ -31,7 +32,43 @@
       MSG_ID_CAP(info, idCap, uType);                     \
   }
 
-class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog> {
+template <typename T>
+LSTATUS SetRegKeyValue(HKEY rootKey,
+                       const wchar_t* subpath,
+                       const wchar_t* key,
+                       const T& value,
+                       DWORD type,
+                       bool disable_reg_redirect = false) {
+  HKEY hKey;
+  auto flag_wow64 = (disable_reg_redirect && is_wow64()) ? KEY_WOW64_64KEY : 0;
+  LSTATUS ret =
+      RegOpenKeyEx(rootKey, subpath, 0, KEY_ALL_ACCESS | flag_wow64, &hKey);
+  if (ret != ERROR_SUCCESS) {
+    ret = RegCreateKeyEx(rootKey, subpath, 0, NULL, 0,
+                         KEY_ALL_ACCESS | flag_wow64, 0, &hKey, NULL);
+    if (ret != ERROR_SUCCESS)
+      return ret;
+  }
+  if (ret == ERROR_SUCCESS) {
+    DWORD dataSize;
+    const BYTE* dataPtr;
+    if constexpr (std::is_same<T, std::wstring>::value) {
+      dataSize = (value.size() + 1) * sizeof(wchar_t);
+      dataPtr = reinterpret_cast<const BYTE*>(value.c_str());
+    } else if constexpr (std::is_same<T, const wchar_t*>::value) {
+      dataSize = (wcslen((wchar_t*)value) + 1) * sizeof(wchar_t);
+      dataPtr = reinterpret_cast<const BYTE*>(value);
+    } else {
+      dataSize = sizeof(T);
+      dataPtr = reinterpret_cast<const BYTE*>(&value);
+    }
+    ret = RegSetValueEx(hKey, key, 0, type, dataPtr, dataSize);
+    RegCloseKey(hKey);
+  }
+  return ret;
+}
+
+class InstallOptionsDialog : public CDialogDpiAware<InstallOptionsDialog> {
  public:
   enum { IDD = IDD_INSTALL_OPTIONS };
 
@@ -39,12 +76,12 @@ class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog> {
   ~InstallOptionsDialog();
 
   bool installed;
-  bool hant;
-  bool old_ime_support;
+  std::wstring profile;
   std::wstring user_dir;
 
  protected:
   BEGIN_MSG_MAP(InstallOptionsDialog)
+  CHAIN_MSG_MAP(CDialogDpiAware<InstallOptionsDialog>)
   MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
   MESSAGE_HANDLER(WM_CLOSE, OnClose)
   COMMAND_ID_HANDLER(IDOK, OnOK)
@@ -61,13 +98,11 @@ class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog> {
   LRESULT OnUseDefaultDir(WORD, WORD code, HWND, BOOL&);
   LRESULT OnUseCustomDir(WORD, WORD code, HWND, BOOL&);
 
-  CButton cn_;
-  CButton tw_;
+  CComboBox profile_;
   CButton remove_;
   CButton default_dir_;
   CButton custom_dir_;
   CButton ok_;
-  CButton ime_;
   CButton button_custom_dir_;
   CEdit dir_;
 };

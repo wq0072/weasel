@@ -1,6 +1,11 @@
-#pragma once
+﻿#pragma once
 #include <filesystem>
 #include <string>
+#include <sstream>
+#include <wrl/client.h>
+using namespace Microsoft::WRL;
+
+namespace fs = std::filesystem;
 
 inline int utf8towcslen(const char* utf8_str, int utf8_len) {
   return MultiByteToWideChar(CP_UTF8, 0, utf8_str, utf8_len, NULL, 0);
@@ -29,6 +34,16 @@ inline std::wstring getUsername() {
 // data directories
 std::filesystem::path WeaselSharedDataPath();
 std::filesystem::path WeaselUserDataPath();
+inline fs::path WeaselLogPath() {
+  WCHAR _path[MAX_PATH] = {0};
+  // default location
+  ExpandEnvironmentStringsW(L"%TEMP%\\rime.weasel", _path, _countof(_path));
+  fs::path path = fs::path(_path);
+  if (!fs::exists(path)) {
+    fs::create_directories(path);
+  }
+  return path;
+}
 
 inline BOOL IsUserDarkMode() {
   constexpr const LPCWSTR key =
@@ -128,7 +143,7 @@ const wchar_t EscapeChar<wchar_t>::tab_escape = L't';
 
 template <typename CharT>
 inline std::basic_string<CharT> escape_string(
-    const std::basic_string<CharT> input) {
+    const std::basic_string<CharT>& input) {
   using Esc = EscapeChar<CharT>;
   std::basic_stringstream<CharT> res;
   for (auto p = input.begin(); p != input.end(); ++p) {
@@ -170,3 +185,137 @@ inline std::basic_string<CharT> unescape_string(
 
 // resource
 std::string GetCustomResource(const char* name, const char* type);
+
+inline std::wstring get_weasel_ime_name() {
+  LANGID langId = GetUserDefaultUILanguage();
+
+  if (langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL) ||
+      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED) ||
+      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_HONGKONG) ||
+      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SINGAPORE) ||
+      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_MACAU)) {
+    return L"小狼毫";
+  } else {
+    return L"Weasel";
+  }
+}
+
+inline LONG RegGetStringValue(HKEY key,
+                              LPCWSTR lpSubKey,
+                              LPCWSTR lpValue,
+                              std::wstring& value) {
+  TCHAR szValue[MAX_PATH];
+  DWORD dwBufLen = MAX_PATH;
+
+  LONG lRes = RegGetValue(key, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, szValue,
+                          &dwBufLen);
+  if (lRes == ERROR_SUCCESS) {
+    value = std::wstring(szValue);
+  }
+  return lRes;
+}
+
+inline LANGID get_language_id() {
+  std::wstring lang{};
+  if (RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\Weasel",
+                        L"Language", lang) == ERROR_SUCCESS) {
+    if (lang == L"chs")
+      return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED);
+    else if (lang == L"cht")
+      return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL);
+    else if (lang == L"eng")
+      return MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
+  }
+  LANGID langId = GetUserDefaultUILanguage();
+  if (langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED) ||
+      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SINGAPORE)) {
+    langId = MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED);
+  } else if (langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL) ||
+             langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_HONGKONG) ||
+             langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_MACAU)) {
+    langId = MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL);
+  } else {
+    langId = MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
+  }
+  return langId;
+}
+
+#define wtou8(x) wstring_to_string(x, CP_UTF8)
+#define wtoacp(x) wstring_to_string(x, CP_ACP)
+#define u8tow(x) string_to_wstring(x, CP_UTF8)
+#define acptow(x) string_to_wstring(x, CP_ACP)
+#define u8toacp(x) wtoacp(u8tow(x))
+
+class DebugStream {
+ public:
+  DebugStream() = default;
+  ~DebugStream() { OutputDebugString(ss.str().c_str()); }
+  template <typename T>
+  DebugStream& operator<<(const T& value) {
+    ss << value;
+    return *this;
+  }
+  DebugStream& operator<<(const char* value) {
+    if (value) {
+      std::wstring wvalue(u8tow(value));  // utf-8
+      ss << wvalue;
+    }
+    return *this;
+  }
+  DebugStream& operator<<(const std::string value) {
+    std::wstring wvalue(acptow(value));  // utf-8
+    ss << wvalue;
+    return *this;
+  }
+
+ private:
+  std::wstringstream ss;
+};
+inline std::string current_time() {
+  using namespace std::chrono;
+  auto now = system_clock::now();
+  auto time_point = system_clock::to_time_t(now);
+  auto ns = duration_cast<microseconds>(now.time_since_epoch());
+  std::tm tm;
+  localtime_s(&tm, &time_point);
+  std::ostringstream oss;
+  oss << std::put_time(&tm, "%Y%m%d %H:%M:%S");
+  oss << "." << std::setw(6) << std::setfill('0') << ns.count() % 1000000;
+  return oss.str();
+}
+
+#define DEBUG                                                       \
+  (DebugStream() << "[" << current_time() << " " << __FILE__ << ":" \
+                 << __LINE__ << "] ")
+
+using wstring = std::wstring;
+using string = std::string;
+template <typename T>
+using vector = std::vector<T>;
+
+inline string HRESULTToString(HRESULT hr) {
+  if (SUCCEEDED(hr))
+    return "Success";
+  char buffer[512];
+  DWORD dwFlags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+  DWORD dwSize =
+      FormatMessageA(dwFlags, nullptr, hr, 0, buffer, sizeof(buffer), nullptr);
+  if (dwSize == 0)
+    return "Unknown HRESULT error";
+  return string(buffer);
+}
+
+struct ComException {
+  HRESULT result;
+  ComException(HRESULT const value) : result(value) {}
+};
+
+#define HR(result) HR_Impl(result, __FILE__, __LINE__)
+
+inline void HR_Impl(HRESULT const result, const char* file, int line) {
+  if (S_OK != result) {
+    DebugStream() << "[" << current_time() << " " << file << ":" << line << "] "
+                  << HRESULTToString(result);
+    throw ComException(result);
+  }
+}

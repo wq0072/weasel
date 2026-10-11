@@ -2,7 +2,7 @@
 
 #include "WeaselTSF.h"
 #include "CandidateList.h"
-#include "KeyEvent.h"
+#include <KeyEvent.h>
 #include <math.h>
 
 using namespace std;
@@ -108,7 +108,7 @@ STDMETHODIMP CCandidateList::GetDocumentMgr(ITfDocumentMgr** ppdim) {
 }
 
 STDMETHODIMP CCandidateList::GetCount(UINT* pCandidateCount) {
-  *pCandidateCount = _ui->ctx().cinfo.candies.size();
+  *pCandidateCount = static_cast<UINT>(_ui->ctx().cinfo.candies.size());
   return S_OK;
 }
 
@@ -124,7 +124,7 @@ STDMETHODIMP CCandidateList::GetString(UINT uIndex, BSTR* pbstr) {
     return E_INVALIDARG;
 
   auto& str = cinfo.candies[uIndex].str;
-  *pbstr = SysAllocStringLen(str.c_str(), str.size() + 1);
+  *pbstr = SysAllocStringLen(str.c_str(), static_cast<UINT>(str.size()) + 1);
 
   return S_OK;
 }
@@ -209,7 +209,7 @@ void CCandidateList::UpdateUI(const Context& ctx, const Status& status) {
   /// if it is owned by active view window
   //_UpdateOwner();
   _ui->Update(ctx, status);
-  if (_pbShow == FALSE)
+  if (_uiStarted)
     _UpdateUIElement();
 
   if (status.composing)
@@ -229,9 +229,14 @@ void CCandidateList::UpdateInputPosition(RECT const& rc) {
 void CCandidateList::Destroy() {
   // EndUI();
   Show(FALSE);
-  _DisposeUIWindowAll();
+  _DisposeUIWindow();
 }
 
+void CCandidateList::DestroyAll() {
+  // EndUI();
+  Show(FALSE);
+  _DisposeUIWindowAll();
+}
 UIStyle& CCandidateList::style() {
   // return _ui->style();
   return _style;
@@ -279,7 +284,14 @@ HRESULT CCandidateList::_UpdateUIElement() {
 }
 
 void CCandidateList::StartUI() {
+  if (_uiStarted)
+    return;
+
   com_ptr<ITfThreadMgr> pThreadMgr = _tsf->_GetThreadMgr();
+  if (!pThreadMgr) {
+    return;
+  }
+
   com_ptr<ITfUIElementMgr> pUIElementMgr;
   auto hr = pThreadMgr->QueryInterface(&pUIElementMgr);
   if (FAILED(hr))
@@ -294,22 +306,36 @@ void CCandidateList::StartUI() {
                               bool* const next, bool* const scroll_next) {
       _tsf->HandleUICallback(sel, hov, next, scroll_next);
     });
-  pUIElementMgr->BeginUIElement(this, &_pbShow, &uiid);
+  if (FAILED(pUIElementMgr->BeginUIElement(this, &_pbShow, &uiid)))
+    return;
+  _uiStarted = true;
   // pUIElementMgr->UpdateUIElement(uiid);
   if (_pbShow) {
     _ui->style() = _style;
     _MakeUIWindow();
+    if (!_ui_warmed_up && _ui->hwnd() != nullptr) {
+      // Warm up render resources before first visible paint in TSF path.
+      _ui->Refresh();
+      _ui->Hide();
+      _ui_warmed_up = true;
+    }
   }
 }
 
 void CCandidateList::EndUI() {
-  com_ptr<ITfThreadMgr> pThreadMgr = _tsf->_GetThreadMgr();
-  com_ptr<ITfUIElementMgr> emgr;
-  auto hr = pThreadMgr->QueryInterface(&emgr);
-  if (FAILED(hr))
+  if (!_uiStarted)
     return;
-  if (emgr != NULL)
-    emgr->EndUIElement(uiid);
+
+  com_ptr<ITfThreadMgr> pThreadMgr = _tsf->_GetThreadMgr();
+  if (pThreadMgr) {
+    com_ptr<ITfUIElementMgr> emgr;
+    auto hr = pThreadMgr->QueryInterface(&emgr);
+    if (FAILED(hr))
+      return;
+    if (emgr != NULL)
+      emgr->EndUIElement(uiid);
+  }
+  _uiStarted = false;
   _DisposeUIWindow();
 }
 
@@ -332,6 +358,7 @@ void CCandidateList::_DisposeUIWindowAll() {
 
   // call _ui->Destroy(true) to clean resources
   _ui->Destroy(true);
+  _ui_warmed_up = false;
 }
 
 void CCandidateList::_MakeUIWindow() {
@@ -394,7 +421,7 @@ void WeaselTSF::_HandleMousePageEvent(bool* const nextPage,
       int offset = *scrollNextPage ? 1 : -1;
       offset = offset * (is_reposition ? -1 : 1);
       int index = (int)current_select + offset;
-      if (index >= 0 && index < cand_count)
+      if (index >= 0 && index < (int)cand_count)
         m_client.HighlightCandidateOnCurrentPage((size_t)index);
       else {
         KeyEvent ke{0, 0};

@@ -25,7 +25,7 @@ Unicode true
 Name "小狼毫 ${WEASEL_VERSION}"
 
 ; The file to write
-OutFile "archives\weasel-${WEASEL_VERSION}.${WEASEL_BUILD}-installer.exe"
+OutFile "archives\weasel-${PRODUCT_VERSION}-installer.exe"
 
 VIProductVersion "${WEASEL_VERSION}.${WEASEL_BUILD}"
 VIAddVersionKey /LANG=2052 "ProductName" "小狼毫"
@@ -38,12 +38,6 @@ VIAddVersionKey /LANG=2052 "FileVersion" "${WEASEL_VERSION}"
 !define MUI_ICON ..\resource\weasel.ico
 SetCompressor /SOLID lzma
 
-; The default installation directory
-InstallDir $PROGRAMFILES\Rime
-
-; Registry key to check for directory (so if you install again, it will
-; overwrite the old one automatically)
-InstallDirRegKey HKLM "Software\Rime\Weasel" "InstallDir"
 
 ; Request application privileges for Windows Vista
 RequestExecutionLevel admin
@@ -78,7 +72,9 @@ LangString LNKFORAPPFOLDER ${LANG_TRADCHINESE} "【小狼毫】程序文件夾"
 LangString LNKFORUPDATER ${LANG_TRADCHINESE} "【小狼毫】檢查新版本"
 LangString LNKFORSETUP ${LANG_TRADCHINESE} "【小狼毫】安裝選項"
 LangString LNKFORUNINSTALL ${LANG_TRADCHINESE} "卸載小狼毫"
-LangString CONFIRMATION ${LANG_TRADCHINESE} "安裝前，我打盤先卸載舊版本的小狼毫。$\n$\n按下「確定」移除舊版本，按下「取消」放棄本次安裝。"
+LangString CONFIRMATION ${LANG_TRADCHINESE} "安裝前，請先卸載舊版本的小狼毫。$\n$\n按下「確定」移除舊版本，按下「取消」放棄本次安裝。"
+LangString SYSTEMVERSIONNOTOK ${LANG_TRADCHINESE} "您的系统不被支持，最低系統要求:Windows 8.1!"
+LangString AUTOCHKUPDATE ${LANG_TRADCHINESE} "自動檢查版本更新？"
 
 !insertmacro MUI_LANGUAGE "SimpChinese"
 LangString DISPLAYNAME ${LANG_SIMPCHINESE} "小狼毫输入法"
@@ -94,6 +90,8 @@ LangString LNKFORUPDATER ${LANG_SIMPCHINESE} "【小狼毫】检查新版本"
 LangString LNKFORSETUP ${LANG_SIMPCHINESE} "【小狼毫】安装选项"
 LangString LNKFORUNINSTALL ${LANG_SIMPCHINESE} "卸载小狼毫"
 LangString CONFIRMATION ${LANG_SIMPCHINESE} '安装前，请先卸载旧版本的小狼毫。$\n$\n点击 "确定" 移除旧版本，或点击 "取消" 放弃本次安装。'
+LangString SYSTEMVERSIONNOTOK ${LANG_SIMPCHINESE} "您的系統不被支持，最低系统要求:Windows 8.1!"
+LangString AUTOCHKUPDATE ${LANG_SIMPCHINESE} "自动检查版本更新？"
 
 !insertmacro MUI_LANGUAGE "English"
 LangString DISPLAYNAME ${LANG_ENGLISH} "Weasel"
@@ -109,10 +107,41 @@ LangString LNKFORUPDATER ${LANG_ENGLISH} "Weasel Check for Updates"
 LangString LNKFORSETUP ${LANG_ENGLISH} "Weasel Installation Preference"
 LangString LNKFORUNINSTALL ${LANG_ENGLISH} "Uninstall Weasel"
 LangString CONFIRMATION ${LANG_ENGLISH} "Before installation, please uninstall the old version of Weasel.$\n$\nPress 'OK' to remove the old version, or 'Cancel' to abort installation."
+LangString SYSTEMVERSIONNOTOK ${LANG_ENGLISH} "Your system not supported, minimium system required: Windows 8.1!"
+LangString AUTOCHKUPDATE ${LANG_ENGLISH} "Automatically check for updates?"
 
 ;--------------------------------
 
 Function .onInit
+  ; if not version >= 8.1, quit and MessageBox(if not silent)
+  ${IfNot} ${AtLeastWin8.1}
+    IfSilent toquit
+    MessageBox MB_OK '$(SYSTEMVERSIONNOTOK)'
+toquit:
+    Quit
+  ${EndIf}
+
+  ReadRegStr $R0 HKLM "Software\Rime\Weasel" "InstallDir"
+  StrCmp $R0 "" 0 skip
+  ; The default installation directory
+  ; install x64 build for NativeARM64_WINDOWS11 and NativeAMD64_WINDOWS11
+  ${If} ${AtLeastWin11} ; Windows 11 and above
+    ${If} ${IsNativeARM64}
+      StrCpy $INSTDIR "$PROGRAMFILES64\Rime"
+    ${ElseIf} ${IsNativeAMD64}
+      StrCpy $INSTDIR "$PROGRAMFILES64\Rime"
+    ${Else}
+      StrCpy $INSTDIR "$PROGRAMFILES\Rime"
+    ${Endif}
+  ; install x64 build for NativeAMD64_BELLOW_WINDOWS11
+  ${Else} ; Windows 10 or bellow
+    ${If} ${IsNativeAMD64}
+      StrCpy $INSTDIR "$PROGRAMFILES64\Rime"
+    ${Else}
+      StrCpy $INSTDIR "$PROGRAMFILES\Rime"
+    ${Endif}
+  ${Endif}
+skip:
   ReadRegStr $R0 HKLM \
   "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel" \
   "UninstallString"
@@ -132,11 +161,40 @@ uninst:
   CopyFiles $R1\data\*.* $TEMP\weasel-backup
 
 call_uninstaller:
-  ExecWait '$R0 /S'
+  ExecWait '"$R1\WeaselServer.exe" /quit'
+  ExecWait '"$R1\WeaselSetup.exe" /u'
+  ; Remove registry keys
+  DeleteRegKey HKLM SOFTWARE\Rime
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
+  ; don't redirect on 64 bit system for auto run setting
+  ${If} ${IsNativeARM64}
+    SetRegView 64
+  ${ElseIf} ${IsNativeAMD64}
+    SetRegView 64
+  ${Endif}
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
+  ; recover back to 32bit view
+  SetRegView 32
+  ; Remove files and uninstaller
+  Delete  "$R1\data\opencc\*.*"
+  Delete  "$R1\data\*.*"
+  Delete  "$R1\*.*"
+  RMDir   "$R1\data\opencc"
+  RMDir   "$R1\data"
+  RMDir   "$R1"
+  SetShellVarContext all
+  Delete  "$SMPROGRAMS\$(DISPLAYNAME)\*.*"
+  RMDir  "$SMPROGRAMS\$(DISPLAYNAME)"
+  ; Prompt reboot
+  SetRebootFlag true
   Sleep 800
 
 done:
 FunctionEnd
+
+; Registry key to check for directory (so if you install again, it will
+; overwrite the old one automatically)
+InstallDirRegKey HKLM "Software\Rime\Weasel" "InstallDir"
 
 ; The stuff to install
 Section "Weasel"
@@ -185,23 +243,6 @@ program_files:
     File /nonfatal "weaselARM64.dll"
     File /nonfatal "weaselARM64X.dll"
   ${EndIf}
-  File "weasel.ime"
-  ${If} ${RunningX64}
-    File "weaselx64.ime"
-  ${EndIf}
-  ${If} ${IsNativeARM64}
-    File /nonfatal "weaselARM.ime"
-    File /nonfatal "weaselARM64.ime"
-    File /nonfatal "weaselARM64X.ime"
-  ${EndIf}
-  File "weaselt.ime"
-  ${If} ${RunningX64}
-    File "weaseltx64.ime"
-  ${EndIf}
-  ${If} ${IsNativeARM64}
-    File /nonfatal "weaseltARM.ime"
-    File /nonfatal "weaseltARM64.ime"
-  ${EndIf}
   ; install x64 build for NativeARM64_WINDOWS11 and NativeAMD64_WINDOWS11
   ${If} ${AtLeastWin11} ; Windows 11 and above
     ${If} ${IsNativeARM64}
@@ -245,9 +286,6 @@ program_files:
   SetOutPath $INSTDIR\data\opencc
   File "data\opencc\*.json"
   File "data\opencc\*.ocd*"
-  ; images
-  SetOutPath $INSTDIR\data\preview
-  File "data\preview\*.png"
 
   SetOutPath $INSTDIR
 
@@ -266,23 +304,24 @@ program_files:
 
   ; Write the uninstall keys for Windows
   WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayName" "$(DISPLAYNAME)"
+  WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\WeaselServer.exe"'
+  WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayVersion" "${WEASEL_VERSION}.${WEASEL_BUILD}"
   WriteRegStr HKLM "${REG_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKLM "${REG_UNINST_KEY}"  "DisplayVersion" "${WEASEL_VERSION}.${WEASEL_BUILD}"
-  WriteRegStr HKLM "${REG_UNINST_KEY}"  "Publisher" "式恕堂"
-  WriteRegStr HKLM "${REG_UNINST_KEY}"  "URLInfoAbout" "https://rime.im/"
-  WriteRegStr HKLM "${REG_UNINST_KEY}"  "HelpLink" "https://rime.im/docs/"
+  WriteRegStr HKLM "${REG_UNINST_KEY}" "Publisher" "式恕堂"
+  WriteRegStr HKLM "${REG_UNINST_KEY}" "URLInfoAbout" "https://rime.im/"
+  WriteRegStr HKLM "${REG_UNINST_KEY}" "HelpLink" "https://rime.im/docs/"
   WriteRegDWORD HKLM "${REG_UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${REG_UNINST_KEY}" "NoRepair" 1
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   ; run as user...
-  IfSilent +2
-    ExecWait "$INSTDIR\WeaselDeployer.exe /install"
-    Goto deploy_done
+  IfSilent deploy_silently
+  ExecWait "$INSTDIR\WeaselDeployer.exe /install"
+  GoTo deploy_done
 
+  deploy_silently:
   ExecWait "$INSTDIR\WeaselDeployer.exe /deploy"
   deploy_done:
-  ; ...
 
   ; don't redirect on 64 bit system for auto run setting
   ${If} ${IsNativeARM64}
@@ -294,6 +333,16 @@ program_files:
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer" "$INSTDIR\WeaselServer.exe"
   ; Start WeaselServer
   Exec "$INSTDIR\WeaselServer.exe"
+
+  ; option CheckForUpdates
+  IfSilent DisableAutoCheckUpdate
+  MessageBox MB_YESNO|MB_ICONINFORMATION "$(AUTOCHKUPDATE)" IDYES EnableAutoCheckUpdate
+  DisableAutoCheckUpdate:
+  WriteRegStr HKCU "Software\Rime\Weasel\Updates" "CheckForUpdates" "0"
+  GoTo end
+  EnableAutoCheckUpdate:
+  WriteRegStr HKCU "Software\Rime\Weasel\Updates" "CheckForUpdates" "1"
+  end:
 
   ; Prompt reboot
   StrCmp $0 "Upgrade" 0 +2
@@ -342,17 +391,15 @@ Section "Uninstall"
 
   ; Remove files and uninstaller
   SetOutPath $TEMP
-  Delete /REBOOTOK "$INSTDIR\data\opencc\*.*"
-  Delete /REBOOTOK "$INSTDIR\data\preview\*.*"
-  Delete /REBOOTOK "$INSTDIR\data\*.*"
-  Delete /REBOOTOK "$INSTDIR\*.*"
-  RMDir /REBOOTOK "$INSTDIR\data\opencc"
-  RMDir /REBOOTOK "$INSTDIR\data\preview"
-  RMDir /REBOOTOK "$INSTDIR\data"
-  RMDir /REBOOTOK "$INSTDIR"
+  Delete  "$INSTDIR\data\opencc\*.*"
+  Delete  "$INSTDIR\data\*.*"
+  Delete  "$INSTDIR\*.*"
+  RMDir  "$INSTDIR\data\opencc"
+  RMDir  "$INSTDIR\data"
+  RMDir  "$INSTDIR"
   SetShellVarContext all
-  Delete /REBOOTOK "$SMPROGRAMS\$(DISPLAYNAME)\*.*"
-  RMDir /REBOOTOK "$SMPROGRAMS\$(DISPLAYNAME)"
+  Delete  "$SMPROGRAMS\$(DISPLAYNAME)\*.*"
+  RMDir  "$SMPROGRAMS\$(DISPLAYNAME)"
 
   ; Prompt reboot
   SetRebootFlag true

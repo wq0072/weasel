@@ -5,6 +5,7 @@
 #include <fstream>
 #include "WeaselDeployer.h"
 #include "Configurator.h"
+#include <ShellScalingApi.h>
 
 CAppModule _Module;
 
@@ -15,17 +16,10 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
                        LPTSTR lpCmdLine,
                        int nCmdShow) {
   UNREFERENCED_PARAMETER(hPrevInstance);
-
-  LCID lcid = GetUserDefaultLCID();
-  if (lcid == 2052 || lcid == 3072 || lcid == 4100) {
-    LANGID langId = SetThreadUILanguage(
-        MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED));
-    SetThreadLocale(langId);
-  } else {
-    LANGID langId = SetThreadUILanguage(
-        MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL));
-    SetThreadLocale(langId);
-  }
+  SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+  LANGID langId = get_language_id();
+  SetThreadUILanguage(langId);
+  SetThreadLocale(langId);
 
   HRESULT hRes = ::CoInitialize(NULL);
   // If you are running on NT 4.0 or higher you can use the following call
@@ -68,6 +62,25 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 static int Run(LPTSTR lpCmdLine) {
   Configurator configurator;
   configurator.Initialize();
+
+  if (!wcscmp(L"/?", lpCmdLine) || !wcscmp(L"/help", lpCmdLine)) {
+    WCHAR msg[1024] = {0};
+    if (LoadString(GetModuleHandle(NULL), IDS_STR_HELP, msg,
+                   sizeof(msg) / sizeof(TCHAR))) {
+      MessageBox(NULL, msg, L"Weasel Deployer", MB_ICONINFORMATION | MB_OK);
+    } else {
+      MessageBox(NULL,
+                 L"Usage: WeaselDeployer.exe [options]\n"
+                 L"/? or /help		- Show this help message\n"
+                 L"/deploy		- Update Workspace\n"
+                 L"/dict		- Manage dictionary\n"
+                 L"/sync		- Sync user data\n"
+                 L"/install		- Install Weasel (Initial deployment)",
+                 L"Weasel Deployer", MB_ICONINFORMATION | MB_OK);
+    }
+    return 0;
+  }
+
   bool deployment_scheduled = !wcscmp(L"/deploy", lpCmdLine);
   if (deployment_scheduled) {
     return configurator.UpdateWorkspace();

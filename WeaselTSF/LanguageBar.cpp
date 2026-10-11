@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include <resource.h>
 #include <thread>
 #include <shellapi.h>
@@ -34,21 +34,6 @@ static void HMENU2ITfMenu(HMENU hMenu, ITfMenu* pTfMenu) {
   }
 }
 
-static LONG RegGetStringValue(HKEY key,
-                              LPCWSTR lpSubKey,
-                              LPCWSTR lpValue,
-                              std::wstring& value) {
-  TCHAR szValue[MAX_PATH];
-  DWORD dwBufLen = MAX_PATH;
-
-  LONG lRes = RegGetValue(key, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, szValue,
-                          &dwBufLen);
-  if (lRes == ERROR_SUCCESS) {
-    value = std::wstring(szValue);
-  }
-  return lRes;
-}
-
 static LPCWSTR GetWeaselRegName() {
   LPCWSTR WEASEL_REG_NAME_;
   if (is_wow64())
@@ -62,12 +47,6 @@ static LPCWSTR GetWeaselRegName() {
 static bool open(const std::wstring& path) {
   return (uintptr_t)ShellExecuteW(NULL, L"open", path.c_str(), NULL, NULL,
                                   SW_SHOWNORMAL) > 32;
-}
-
-static bool explore(const std::wstring& path) {
-  std::wstring quoted_path = L"\"" + path + L"\"";
-  return (uintptr_t)ShellExecuteW(NULL, L"explore", quoted_path.c_str(), NULL,
-                                  NULL, SW_SHOWNORMAL) > 32;
 }
 
 CLangBarItemButton::CLangBarItemButton(com_ptr<WeaselTSF> pTextService,
@@ -90,7 +69,7 @@ CLangBarItemButton::~CLangBarItemButton() {
   DllRelease();
 }
 
-STDAPI CLangBarItemButton::QueryInterface(REFIID riid, void** ppvObject) {
+STDMETHODIMP CLangBarItemButton::QueryInterface(REFIID riid, void** ppvObject) {
   if (ppvObject == NULL)
     return E_INVALIDARG;
 
@@ -108,11 +87,11 @@ STDAPI CLangBarItemButton::QueryInterface(REFIID riid, void** ppvObject) {
   return E_NOINTERFACE;
 }
 
-STDAPI_(ULONG) CLangBarItemButton::AddRef() {
+STDMETHODIMP_(ULONG) CLangBarItemButton::AddRef() {
   return ++_cRef;
 }
 
-STDAPI_(ULONG) CLangBarItemButton::Release() {
+STDMETHODIMP_(ULONG) CLangBarItemButton::Release() {
   LONG cr = --_cRef;
   assert(_cRef >= 0);
   if (_cRef == 0)
@@ -120,7 +99,7 @@ STDAPI_(ULONG) CLangBarItemButton::Release() {
   return cr;
 }
 
-STDAPI CLangBarItemButton::GetInfo(TF_LANGBARITEMINFO* pInfo) {
+STDMETHODIMP CLangBarItemButton::GetInfo(TF_LANGBARITEMINFO* pInfo) {
   pInfo->clsidService = c_clsidTextService;
   pInfo->guidItem = _guid;
   pInfo->dwStyle = TF_LBI_STYLE_BTN_BUTTON | TF_LBI_STYLE_BTN_MENU |
@@ -130,12 +109,12 @@ STDAPI CLangBarItemButton::GetInfo(TF_LANGBARITEMINFO* pInfo) {
   return S_OK;
 }
 
-STDAPI CLangBarItemButton::GetStatus(DWORD* pdwStatus) {
+STDMETHODIMP CLangBarItemButton::GetStatus(DWORD* pdwStatus) {
   *pdwStatus = _status;
   return S_OK;
 }
 
-STDAPI CLangBarItemButton::Show(BOOL fShow) {
+STDMETHODIMP CLangBarItemButton::Show(BOOL fShow) {
   SetLangbarStatus(TF_LBI_STATUS_HIDDEN, fShow ? FALSE : TRUE);
   return S_OK;
 }
@@ -155,20 +134,23 @@ static LANGID GetActiveProfileLangId() {
   return profile.langid;
 }
 
-STDAPI CLangBarItemButton::GetTooltipString(BSTR* pbstrToolTip) {
-  LANGID langid = GetActiveProfileLangId();
-  if (langid == TEXTSERVICE_LANGID) {
+STDMETHODIMP CLangBarItemButton::GetTooltipString(BSTR* pbstrToolTip) {
+  LANGID langid = get_language_id();
+  if (langid == TEXTSERVICE_LANGID_HANS) {
     *pbstrToolTip = SysAllocString(L"左键切换模式，右键打开菜单");
-  } else {
+  } else if (langid == TEXTSERVICE_LANGID_HANT) {
     *pbstrToolTip = SysAllocString(L"左鍵切換模式，右鍵打開菜單");
+  } else {
+    *pbstrToolTip = SysAllocString(
+        L"Left-click to switch modes\n\nRight-click for more options");
   }
 
   return (*pbstrToolTip == NULL) ? E_OUTOFMEMORY : S_OK;
 }
 
-STDAPI CLangBarItemButton::OnClick(TfLBIClick click,
-                                   POINT pt,
-                                   const RECT* prcArea) {
+STDMETHODIMP CLangBarItemButton::OnClick(TfLBIClick click,
+                                         POINT pt,
+                                         const RECT* prcArea) {
   if (click == TF_LBI_CLK_LEFT) {
     _pTextService->_HandleLangBarMenuSelect(
         ascii_mode ? ID_WEASELTRAY_DISABLE_ASCII : ID_WEASELTRAY_ENABLE_ASCII);
@@ -180,12 +162,15 @@ STDAPI CLangBarItemButton::OnClick(TfLBIClick click,
     /* Open menu */
     HWND hwnd = _pTextService->_GetFocusedContextWindow();
     if (hwnd != NULL) {
-      LANGID langid = GetActiveProfileLangId();
-
-      HMENU menu =
-          ((langid == TEXTSERVICE_LANGID)
-               ? LoadMenuW(g_hInst, MAKEINTRESOURCE(IDR_MENU_POPUP))
-               : LoadMenuW(g_hInst, MAKEINTRESOURCE(IDR_MENU_POPUP_HANT)));
+      LANGID langid = get_language_id();
+      HMENU menu;
+      if (langid == TEXTSERVICE_LANGID_HANS) {
+        menu = LoadMenuW(g_hInst, MAKEINTRESOURCE(IDR_MENU_POPUP_HANS));
+      } else if (langid == TEXTSERVICE_LANGID_HANT) {
+        menu = LoadMenuW(g_hInst, MAKEINTRESOURCE(IDR_MENU_POPUP_HANT));
+      } else {
+        menu = LoadMenuW(g_hInst, MAKEINTRESOURCE(IDR_MENU_POPUP));
+      }
       HMENU popupMenu = GetSubMenu(menu, 0);
       UINT wID = TrackPopupMenuEx(
           popupMenu, TPM_NONOTIFY | TPM_RETURNCMD | TPM_HORPOSANIMATION, pt.x,
@@ -197,7 +182,7 @@ STDAPI CLangBarItemButton::OnClick(TfLBIClick click,
   return S_OK;
 }
 
-STDAPI CLangBarItemButton::InitMenu(ITfMenu* pMenu) {
+STDMETHODIMP CLangBarItemButton::InitMenu(ITfMenu* pMenu) {
   HMENU menu = LoadMenuW(g_hInst, MAKEINTRESOURCE(IDR_MENU_POPUP));
   HMENU popupMenu = GetSubMenu(menu, 0);
   HMENU2ITfMenu(popupMenu, pMenu);
@@ -205,12 +190,12 @@ STDAPI CLangBarItemButton::InitMenu(ITfMenu* pMenu) {
   return S_OK;
 }
 
-STDAPI CLangBarItemButton::OnMenuSelect(UINT wID) {
+STDMETHODIMP CLangBarItemButton::OnMenuSelect(UINT wID) {
   _pTextService->_HandleLangBarMenuSelect(wID);
   return S_OK;
 }
 
-STDAPI CLangBarItemButton::GetIcon(HICON* phIcon) {
+STDMETHODIMP CLangBarItemButton::GetIcon(HICON* phIcon) {
   if (ascii_mode) {
     if (_style.current_ascii_icon.empty())
       *phIcon = (HICON)LoadImageW(g_hInst, MAKEINTRESOURCEW(IDI_EN), IMAGE_ICON,
@@ -235,14 +220,14 @@ STDAPI CLangBarItemButton::GetIcon(HICON* phIcon) {
   return (*phIcon == NULL) ? E_FAIL : S_OK;
 }
 
-STDAPI CLangBarItemButton::GetText(BSTR* pbstrText) {
+STDMETHODIMP CLangBarItemButton::GetText(BSTR* pbstrText) {
   *pbstrText = SysAllocString(L"WeaselTSF Button");
   return (*pbstrText == NULL) ? E_OUTOFMEMORY : S_OK;
 }
 
-STDAPI CLangBarItemButton::AdviseSink(REFIID riid,
-                                      IUnknown* punk,
-                                      DWORD* pdwCookie) {
+STDMETHODIMP CLangBarItemButton::AdviseSink(REFIID riid,
+                                            IUnknown* punk,
+                                            DWORD* pdwCookie) {
   if (!IsEqualIID(riid, IID_ITfLangBarItemSink))
     return CONNECT_E_CANNOTCONNECT;
   if (_pLangBarItemSink != NULL)
@@ -257,7 +242,7 @@ STDAPI CLangBarItemButton::AdviseSink(REFIID riid,
   return S_OK;
 }
 
-STDAPI CLangBarItemButton::UnadviseSink(DWORD dwCookie) {
+STDMETHODIMP CLangBarItemButton::UnadviseSink(DWORD dwCookie) {
   if (dwCookie != LANGBARITEMSINK_COOKIE || _pLangBarItemSink == NULL)
     return CONNECT_E_NOCONNECTION;
   _pLangBarItemSink = NULL;
@@ -301,6 +286,12 @@ void CLangBarItemButton::SetLangbarStatus(DWORD dwStatus, BOOL fSet) {
   return;
 }
 
+std::wstring WeaselTSF::_GetRootDir() {
+  std::wstring dir{};
+  RegGetStringValue(HKEY_LOCAL_MACHINE, GetWeaselRegName(), L"WeaselRoot", dir);
+  return dir;
+}
+
 void WeaselTSF::_HandleLangBarMenuSelect(UINT wID) {
   std::wstring dir{};
   switch (wID) {
@@ -315,19 +306,25 @@ void WeaselTSF::_HandleLangBarMenuSelect(UINT wID) {
           });
           th.detach();
         } else
-          explore(dir);
+          open(dir);
       }
       break;
     case ID_WEASELTRAY_USERCONFIG:
-      if (RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\Weasel",
-                            L"RimeUserDir", dir) == ERROR_SUCCESS) {
-        if (dir.empty()) {
-          TCHAR _path[MAX_PATH];
-          ExpandEnvironmentStringsW(L"%AppData%\\Rime", _path, _countof(_path));
-          dir = std::wstring(_path);
-        }
-        explore(dir);
+      if (FAILED(RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\Weasel",
+                                   L"RimeUserDir", dir)) ||
+          dir.empty()) {
+        WCHAR _path[MAX_PATH] = {0};
+        ExpandEnvironmentStringsW(L"%AppData%\\Rime", _path, _countof(_path));
+        dir = std::wstring(_path);
       }
+      if (!dir.empty() && fs::exists(dir))
+        open(dir);
+      else
+        MessageBoxW(NULL, (L"Not found: " + dir).c_str(), L"RimeUserDir",
+                    MB_ICONERROR | MB_OK);
+      break;
+    case ID_WEASELTRAY_LOGDIR:
+      open(WeaselLogPath().wstring());
       break;
     case ID_WEASELTRAY_WIKI:
       open(L"https://rime.im/docs/");
